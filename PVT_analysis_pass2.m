@@ -2,7 +2,7 @@ load("PVTmanipulations.mat")
 
 
 ROWS_PER_SUB = 3; %stores number of rows with screen visits excluded
-SUBCOUNT = 18
+SUBCOUNT = 18;
 
 % group into three tables, ignore pre-ride visits
 placRuns = pvt(strcmp(string(pvt.DRUG), 'PPREDRUG') | strcmp(string(pvt.DRUG), 'PPOSTDRUG') | strcmp(string(pvt.DRUG), 'PPOSTRIDE'),:);
@@ -13,9 +13,9 @@ clepRuns = pvt(strcmp(string(pvt.DRUG), 'CEPREDRUG') | strcmp(string(pvt.DRUG), 
 %   1. pre-drug to pre-ride
 %   2. pre-ride to post-ride
 %   3. pre-drug to post-ride
-meanDiffsPlac = make_diff_table(placRuns, 'ALL_MEAN', ROWS_PER_SUB)
-meanDiffsChlor = make_diff_table(chlorRuns, 'ALL_MEAN', ROWS_PER_SUB)
-meanDiffsClep = make_diff_table(clepRuns, 'ALL_MEAN', ROWS_PER_SUB)
+meanDiffsPlac = make_diff_table(placRuns, 'ALL_MEAN', ROWS_PER_SUB);
+meanDiffsChlor = make_diff_table(chlorRuns, 'ALL_MEAN', ROWS_PER_SUB);
+meanDiffsClep = make_diff_table(clepRuns, 'ALL_MEAN', ROWS_PER_SUB);
 
 
 %concat of each difference of stats
@@ -72,18 +72,16 @@ function t = make_diff_table(tableIn, tableInVar, rows_per_sub)
         %proc one patient
         startNum = subject*3-2;
 
-        startRow = tableIn(startNum, :);
-
         %ID, pre/post reference the chair ride
         subID = tableIn(startNum, :).SUBJECT;
         drugMean = tableIn(startNum, :).(tableInVar);
         preMean = tableIn(startNum+1, :).(tableInVar);
         postMean = tableIn(startNum+2, :).(tableInVar);
     
-        t(subject,:).SUBJECT = subID
-        t(subject,:).DRUG_PRERIDE = preMean - drugMean
-        t(subject,:).PRERIDE_POSTRIDE = postMean - preMean
-        t(subject,:).DRUG_POSTRIDE = postMean - drugMean
+        t(subject,:).SUBJECT = subID;
+        t(subject,:).DRUG_PRERIDE = preMean - drugMean;
+        t(subject,:).PRERIDE_POSTRIDE = postMean - preMean;
+        t(subject,:).DRUG_POSTRIDE = postMean - drugMean;
         
     end
 
