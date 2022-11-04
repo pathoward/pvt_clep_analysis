@@ -1,8 +1,10 @@
 load("PVTmanipulations.mat")
 
-
 ROWS_PER_SUB = 3; %stores number of rows with screen visits excluded
-SUBCOUNT = 18;
+SUBCOUNT = 18; %number of study subjects/number of columns
+NUMDIFFS = 3; %number of columns for Friedman's test
+CRIT_CHI2_2DF = 5.991; % critical chi2 val for df = 2 (comparing 3 columns)
+
 
 % group into three tables, ignore pre-ride visits
 placRuns = pvt(strcmp(string(pvt.DRUG), 'PPREDRUG') | strcmp(string(pvt.DRUG), 'PPOSTDRUG') | strcmp(string(pvt.DRUG), 'PPOSTRIDE'),:);
@@ -46,12 +48,25 @@ diffComp_PRPO = table2array(diffComp_PRPO_TABLE);
 diffComp_DRPO = table2array(diffComp_DRPO_TABLE);
 
 %See if any diffs are sig
-%PROG 10/7: "Must have at least 2 rows and columns error" got more than
-%that for sure
-p1 = friedman(diffComp_DRPR, SUBCOUNT);
-p2 = friedman(diffComp_PRPO, SUBCOUNT);
-p3 = friedman(diffComp_DRPO, SUBCOUNT);
+%PROG 11/4: "Must have at least 2 rows and columns error" from 10/7
+%           fixed, was using number of rows rather than cols
 
+p1 = friedman(diffComp_DRPR, NUMDIFFS);
+p2 = friedman(diffComp_PRPO, NUMDIFFS);
+p3 = friedman(diffComp_DRPO, NUMDIFFS);
+
+% initialize results cell array to 0s == False
+results = {0, 0, 0};
+
+if p1 > CRIT_CHI2_2DF
+    results{1} = 1;
+end
+if p2 > CRIT_CHI2_2DF
+    results{2} = 1;
+end
+if p3 > CRIT_CHI2_2DF
+    results{3} = 1;
+end
 
 
 
@@ -86,17 +101,3 @@ function t = make_diff_table(tableIn, tableInVar, rows_per_sub)
     end
 
 end
-
-% meanDiffsChlor
-% meanDiffsClep
-
-% % concat sorted means across three drug phases
-% sPlacMeans = renamevars(sortedPlacRuns(:, 7), 'ALL_MEAN', 'PLAC_MEAN');
-% sChlorMeans = renamevars(sortedChlorRuns(:, 7), 'ALL_MEAN', 'CHLOR_MEAN');
-% sClepMeans = renamevars(sortedClepRuns(:, 7), 'ALL_MEAN', 'CLEP_MEAN');
-% 
-% % join into one table and convert to matrix
-% sortedMeans = [sPlacMeans sChlorMeans sClepMeans];
-% sortedMeansArray = table2array(sortedMeans)
-% 
-% p = friedman(sortedMeansArray, 18)
