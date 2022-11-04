@@ -12,8 +12,9 @@ load("PVTmanipulations.mat")
 % 3) 
 
 % This script looks for significant differences between study phases of 
-% chlorpheniramine/ephedrine PVT motion sickness trials. Comparisons are
-% made between predrug, postdrug/preride, and postride phases, as well as
+% chlorpheniramine/ephedrine PVT motion sickness trials. Comparisons of
+% each column are made. Comparisons are made between predrug, 
+% postdrug/preride, and postride phases, as well as
 % a simplified predrug/postride phase comparison. Outputs are formatted as:
 %   {STATISTIC} {predrug/preride significant} {preride/postride significant}
 %   {predrug/postride significant}
@@ -36,6 +37,7 @@ set(0,'DefaultFigureVisible','off') %turns off excessive graphics
 stats = {'ALL_MEAN', 'ALL_MED', 'SLOW_MEAN', 'FAST_MEAN', 'IALL_MEAN', 'IALL_MED'};
 
 %contains stats mapped to their results
+results_alldiff = containers.Map();
 results_3diff = containers.Map();
 results_2diff = containers.Map();
 
@@ -44,6 +46,7 @@ for idx = 1:numel(stats)
     
     stat = stats{idx};
     
+    results_alldiff(stat) = studyColumnAll()
     results_3diff(stat) = studyColumn3diffs(stat, pvt, ROWS_PER_SUB, NUM3DIFFS, CRIT_CHI2_2DF);
     results_2diff(stat) = studyColumn2diffs(stat, pvt, ROWS_PER_SUB, NUM2DIFFS, CRIT_CHI2_1DF);
 
@@ -53,16 +56,32 @@ end
 k = keys(results_3diff) ;
 val = values(results_3diff) ;
 for i = 1:length(results_3diff)
- [k{i} val{i}]
+ [k{i} val{i}];
 end
 
 %return results of 2diff analysis
 k = keys(results_2diff) ;
 val = values(results_2diff) ;
 for i = 1:length(results_2diff)
- [k{i} val{i}]
+ [k{i} val{i}];
 end
 
+
+
+function results = studyColumnAll(stats, pvt, ROWS_PER_SUB)
+    
+    stats_tables = containers.Map();
+
+    for idx = 1:numel(stats)
+    
+        stat = stats{idx};
+        
+        stats_tables(stat) = flattenData(stat, pvt, ROWS_PER_SUB);
+
+        
+    end
+
+end
 
 % takes a statistic from column names and calculates if there
 % is a significant difference across each patient for 3 differences:
@@ -186,6 +205,51 @@ function results = studyColumn2diffs(statistic,pvt, ROWS_PER_SUB, NUM2DIFFS, CRI
         results{3} = 1;
     end
 end
+
+
+function t = flattenData(stat, pvt, rows_per_sub)
+
+    %preallocate table
+%     subjects = height(tableIn)/rows_per_sub;
+%     sz = [subjects 9]; %10 = num stats + subject col
+%     varTypes = ["double","double","double",
+%                 "double","double","double",
+%                 "double","double","double"];
+% 
+%     varNames = ['PPREDRUG','PPOSTDRUG','PPOSTRIDE',
+%                 'CPREDRUG','CPOSTDRUG','CPOSTRIDE',
+%                 'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'];
+
+    %t = table('Size',sz,'VariableTypes',varTypes,'VariableNames',varNames);
+    
+    statIsolated = pvt(:, {'SUBJECT', 'DRUG', stat});
+    
+    statUnstacked = unstack(statIsolated, stat, 'DRUG');
+
+    statSorted = sortrows(statUnstacked,{'SUBJECT'})
+
+    statFinal=statSorted(:,{'PPREDRUG','PPOSTDRUG','PPOSTRIDE','CPREDRUG','CPOSTDRUG','CPOSTRIDE',...
+    'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'});
+    
+    t = statFinal 
+%     % group into three tables, ignore pre-ride visits
+%     placRuns = pvt(strcmp(string(pvt.DRUG), 'PPREDRUG') | strcmp(string(pvt.DRUG), 'PPOSTDRUG') | strcmp(string(pvt.DRUG), 'PPOSTRIDE'),:);
+%     chlorRuns = pvt(strcmp(string(pvt.DRUG), 'CPREDRUG') | strcmp(string(pvt.DRUG), 'CPOSTDRUG') | strcmp(string(pvt.DRUG), 'CPOSTRIDE'),:);
+%     clepRuns = pvt(strcmp(string(pvt.DRUG), 'CEPREDRUG') | strcmp(string(pvt.DRUG), 'CEPOSTDRUG') | strcmp(string(pvt.DRUG), 'CEPOSTRIDE'),:);
+%     
+%     % make table of differences of the statistic from:
+%     %   1. pre-drug to pre-ride
+%     %   2. pre-ride to post-ride
+%     %   3. pre-drug to post-ride
+%     meanDiffsPlac = make_3diff_table(placRuns, statistic, ROWS_PER_SUB);
+%     meanDiffsChlor = make_3diff_table(chlorRuns, statistic, ROWS_PER_SUB);
+%     meanDiffsClep = make_3diff_table(clepRuns, statistic, ROWS_PER_SUB);
+
+
+
+end
+
+
 % maybe need to remove "PRERIDE_POSTRIDE". Just the predrug to preride
 % indicates drug effects, predrug to postride with drug runs compared
 % to control show how well performance loss is mitigated.

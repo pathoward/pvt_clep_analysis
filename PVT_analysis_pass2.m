@@ -1,16 +1,67 @@
 load("PVTmanipulations.mat")
 
+% v1.0 PVT significant differences
+% Patrick Howard
+% Space Medicine Innovations Lab, Dartmouth Hitchcock Medical Center
+
+% rewrite to make comparisons of one baseline to all effects
+% work in bonferroni or tukey posthoc testing 
+
+% 1) replicate this using 
+% 2) do a data transform (log/arcsin)
+% 3) 
+
+% This script looks for significant differences between study phases of 
+% chlorpheniramine/ephedrine PVT motion sickness trials. Comparisons are
+% made between predrug, postdrug/preride, and postride phases, as well as
+% a simplified predrug/postride phase comparison. Outputs are formatted as:
+%   {STATISTIC} {predrug/preride significant} {preride/postride significant}
+%   {predrug/postride significant}
+% significance measured by Friedman's nonparametric ANOVA. If critical
+% chisquare exceeded, value is 1. If not, value is 0.
+
+%set(0,'DefaultFigureVisible','off') in command line to turn off graphics
+
+%%%%%% Set relevant constants %%%%%%%
 ROWS_PER_SUB = 3; %stores number of rows with screen visits excluded
 SUBCOUNT = 18; %number of study subjects/number of columns
 NUM3DIFFS = 3; %number of columns for Friedman's test
 NUM2DIFFS = 2;
+REPS = 1; %reps for Friedman's parameter
 CRIT_CHI2_2DF = 5.991; % critical chi2 val for df = 2 (comparing 3 columns)
 CRIT_CHI2_1DF = 3.841; % critical chi2 val for df = 1 (comparing 2 columns)
+set(0,'DefaultFigureVisible','off') %turns off excessive graphics
 
+%utility cell array of all stats
+stats = {'ALL_MEAN', 'ALL_MED', 'SLOW_MEAN', 'FAST_MEAN', 'IALL_MEAN', 'IALL_MED'};
 
-testres1 = studyColumn3diffs('ALL_MEAN', pvt, ROWS_PER_SUB, NUM3DIFFS, CRIT_CHI2_2DF);
-testres2 = studyColumn2diffs('ALL_MEAN', pvt, ROWS_PER_SUB, NUM2DIFFS, CRIT_CHI2_1DF);
+%contains stats mapped to their results
+results_3diff = containers.Map();
+results_2diff = containers.Map();
 
+% for each stat, complete the 3diff and 2diff analysis
+for idx = 1:numel(stats)
+    
+    stat = stats{idx};
+    
+    results_3diff(stat) = studyColumn3diffs(stat, pvt, ROWS_PER_SUB, NUM3DIFFS, CRIT_CHI2_2DF);
+    results_2diff(stat) = studyColumn2diffs(stat, pvt, ROWS_PER_SUB, NUM2DIFFS, CRIT_CHI2_1DF);
+
+end
+
+%return results of 3diff analysis
+k = keys(results_3diff) ;
+val = values(results_3diff) ;
+for i = 1:length(results_3diff)
+ [k{i} val{i}]
+end
+
+%return results of 2diff analysis
+k = keys(results_2diff) ;
+val = values(results_2diff) ;
+for i = 1:length(results_2diff)
+ [k{i} val{i}]
+end
 
 
 % takes a statistic from column names and calculates if there

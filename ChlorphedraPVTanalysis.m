@@ -48,6 +48,7 @@ PVTALL_MED=PVTALL_MED(:,{'PPREDRUG','PPOSTDRUG','PPOSTRIDE','CPREDRUG','CPOSTDRU
 
 Time=[1 2 3 4 5 6 7 8 9];
 rmPVTALL_MED = fitrm(PVTALL_MED,'PPREDRUG-CEPOSTRIDE ~ 1','WithinDesign',Time);
+
 ranovatblPVTALL_MED = ranova(rmPVTALL_MED);
 TukeyFactPVTALL_MED=multcompare(rmPVTALL_MED,'Time');
 BonferroniPVTALL_MED=multcompare(rmPVTALL_MED,'Time','ComparisonType','bonferroni');
