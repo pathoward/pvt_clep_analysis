@@ -1,4 +1,4 @@
-load("PVTmanipulations.mat")
+load("Updates 11-4.mat")
 
 % v2.0 PVT significant differences
 % Patrick Howard
@@ -82,20 +82,28 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
     
     statistics = keys(stats_tables);
     tables = values(stats_tables);
+    sigMap = containers.Map();
 
     %2d array indicating if study phases had a sig difference
     for statIdx = 1:numel(statistics)
         
-        statArray = {-1, -1, -1, -1, -1, -1;
-           -1, -1, -1, -1, -1, -1;
-           -1, -1, -1, -1, -1, -1;
-           -1, -1, -1, -1, -1, -1;
-           -1, -1, -1, -1, -1, -1;
-           -1, -1, -1, -1, -1, -1};
+        statArray = {-1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;};
+
 
         stat = statistics{statIdx};
         table = tables{statIdx};
-        sigMap = containers.Map();
+        phaseMap = containers.Map({1,2,3,4,5,6,7,8,9}, ...
+            {'PPREDRUG','PPOSTDRUG','PPOSTRIDE', ...
+            'CPREDRUG','CPOSTDRUG','CPOSTRIDE',...
+            'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'});
         
         %guarantees lowest possible sub-cutoff p val
         for phase1 = 1:NUMPHASES
@@ -103,25 +111,25 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
             
                 if phase1 ~= phase2
     
-                    studyArray = table2array(table(phase1, phase2));
+                    studyArray = table2array(table(:,{phaseMap(phase1),phaseMap(phase2)}));
                     p = friedman(studyArray, 1, 'off');
                     
                     %if significant, record relationship
                     if p <= P_CUT
                         
-                        #find curr vals
-                        curr_p_f = statArray(phase1, phase2);
-                        curr_p_b = statArray(phase2, phase1);
+                        %find curr vals
+                        curr_p_f = cell2mat(statArray(phase1, phase2));
+                        curr_p_b = cell2mat(statArray(phase2, phase1));
 
                         %update both to lowest if currently -1, or not -1
                         %but greater
 
                         if or(curr_p_f == -1, and(curr_p_f ~= -1, p < curr_p_f))
-                            statArray(phase1, phase2) = p;
+                            statArray(phase1, phase2) = num2cell(p);
                         end
 
                         if or(curr_p_b == -1, and(curr_p_b ~= -1, p < curr_p_b))
-                            statArray(phase2, phase1) = p;
+                            statArray(phase2, phase1) = num2cell(p);
                         end
 
                     end                   
@@ -135,8 +143,32 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
     end
 
 
+    numSig = 0;
+    %for each stat, search for significant relationships, and print
+    for statIdx = 1:numel(statistics)
+        stat = statistics{statIdx};
+        sigArray = sigMap(stat);
 
+        for row = 1:NUMPHASES
+            for col = 1:NUMPHASES
+            
+                if col ~= row
+                    
+                    %print stat, phases, pval, numresults, max Results
+                    %(6stats*72comparisons)
+                    if cell2mat(sigArray(row, col)) ~= -1 %only changed if significant
+                        [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig 6*72]
+                        numSig = numSig + 1;
+                    end
 
+                end
+
+            end
+        end
+
+    end
+    
+    results = sigMap;
 end
 
 % takes a statistic from column names and calculates if there
