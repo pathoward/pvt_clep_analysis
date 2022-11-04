@@ -28,6 +28,8 @@ ROWS_PER_SUB = 3; %stores number of rows with screen visits excluded
 SUBCOUNT = 18; %number of study subjects/number of columns
 NUM3DIFFS = 3; %number of columns for Friedman's test
 NUM2DIFFS = 2;
+NUMPHASES = 9; %number of timepoints measured
+P_CUT = .05; %pval cutoff
 REPS = 1; %reps for Friedman's parameter
 CRIT_CHI2_2DF = 5.991; % critical chi2 val for df = 2 (comparing 3 columns)
 CRIT_CHI2_1DF = 3.841; % critical chi2 val for df = 1 (comparing 2 columns)
@@ -41,45 +43,99 @@ results_alldiff = containers.Map();
 results_3diff = containers.Map();
 results_2diff = containers.Map();
 
-% for each stat, complete the 3diff and 2diff analysis
-for idx = 1:numel(stats)
-    
-    stat = stats{idx};
-    
-    results_alldiff(stat) = studyColumnAll()
-    results_3diff(stat) = studyColumn3diffs(stat, pvt, ROWS_PER_SUB, NUM3DIFFS, CRIT_CHI2_2DF);
-    results_2diff(stat) = studyColumn2diffs(stat, pvt, ROWS_PER_SUB, NUM2DIFFS, CRIT_CHI2_1DF);
+% % for each stat, complete the 3diff and 2diff analysis
+% for idx = 1:numel(stats)
+%     
+%     stat = stats{idx};
+%     
+%     results_alldiff(stat) = studyColumnAll()
+%     results_3diff(stat) = studyColumn3diffs(stat, pvt, ROWS_PER_SUB, NUM3DIFFS, CRIT_CHI2_2DF);
+%     results_2diff(stat) = studyColumn2diffs(stat, pvt, ROWS_PER_SUB, NUM2DIFFS, CRIT_CHI2_1DF);
+% 
+% end
+% 
+% %return results of 3diff analysis
+% k = keys(results_3diff) ;
+% val = values(results_3diff) ;
+% for i = 1:length(results_3diff)
+%  [k{i} val{i}];
+% end
+% 
+% %return results of 2diff analysis
+% k = keys(results_2diff) ;
+% val = values(results_2diff) ;
+% for i = 1:length(results_2diff)
+%  [k{i} val{i}];
+% end
 
-end
+print = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2_1DF, P_CUT);
 
-%return results of 3diff analysis
-k = keys(results_3diff) ;
-val = values(results_3diff) ;
-for i = 1:length(results_3diff)
- [k{i} val{i}];
-end
-
-%return results of 2diff analysis
-k = keys(results_2diff) ;
-val = values(results_2diff) ;
-for i = 1:length(results_2diff)
- [k{i} val{i}];
-end
-
-
-
-function results = studyColumnAll(stats, pvt, ROWS_PER_SUB)
+function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2_1DF, P_CUT)
     
     stats_tables = containers.Map();
 
+    %build table for each statistic
     for idx = 1:numel(stats)
-    
-        stat = stats{idx};
-        
+        stat = stats{idx};     
         stats_tables(stat) = flattenData(stat, pvt, ROWS_PER_SUB);
-
-        
     end
+    
+    statistics = keys(stats_tables);
+    tables = values(stats_tables);
+
+    %2d array indicating if study phases had a sig difference
+    for statIdx = 1:numel(statistics)
+        
+        statArray = {-1, -1, -1, -1, -1, -1;
+           -1, -1, -1, -1, -1, -1;
+           -1, -1, -1, -1, -1, -1;
+           -1, -1, -1, -1, -1, -1;
+           -1, -1, -1, -1, -1, -1;
+           -1, -1, -1, -1, -1, -1};
+
+        stat = statistics{statIdx};
+        table = tables{statIdx};
+        sigMap = containers.Map();
+        
+        %guarantees lowest possible sub-cutoff p val
+        for phase1 = 1:NUMPHASES
+            for phase2 = 1:NUMPHASES
+            
+                if phase1 ~= phase2
+    
+                    studyArray = table2array(table(phase1, phase2));
+                    p = friedman(studyArray, 1, 'off');
+                    
+                    %if significant, record relationship
+                    if p <= P_CUT
+                        
+                        #find curr vals
+                        curr_p_f = statArray(phase1, phase2);
+                        curr_p_b = statArray(phase2, phase1);
+
+                        %update both to lowest if currently -1, or not -1
+                        %but greater
+
+                        if or(curr_p_f == -1, and(curr_p_f ~= -1, p < curr_p_f))
+                            statArray(phase1, phase2) = p;
+                        end
+
+                        if or(curr_p_b == -1, and(curr_p_b ~= -1, p < curr_p_b))
+                            statArray(phase2, phase1) = p;
+                        end
+
+                    end                   
+    
+                end
+            end
+        end
+
+        sigMap(stat) = statArray;
+
+    end
+
+
+
 
 end
 
@@ -208,44 +264,17 @@ end
 
 
 function t = flattenData(stat, pvt, rows_per_sub)
-
-    %preallocate table
-%     subjects = height(tableIn)/rows_per_sub;
-%     sz = [subjects 9]; %10 = num stats + subject col
-%     varTypes = ["double","double","double",
-%                 "double","double","double",
-%                 "double","double","double"];
-% 
-%     varNames = ['PPREDRUG','PPOSTDRUG','PPOSTRIDE',
-%                 'CPREDRUG','CPOSTDRUG','CPOSTRIDE',
-%                 'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'];
-
-    %t = table('Size',sz,'VariableTypes',varTypes,'VariableNames',varNames);
     
     statIsolated = pvt(:, {'SUBJECT', 'DRUG', stat});
     
     statUnstacked = unstack(statIsolated, stat, 'DRUG');
 
-    statSorted = sortrows(statUnstacked,{'SUBJECT'})
+    statSorted = sortrows(statUnstacked,{'SUBJECT'});
 
     statFinal=statSorted(:,{'PPREDRUG','PPOSTDRUG','PPOSTRIDE','CPREDRUG','CPOSTDRUG','CPOSTRIDE',...
     'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'});
     
-    t = statFinal 
-%     % group into three tables, ignore pre-ride visits
-%     placRuns = pvt(strcmp(string(pvt.DRUG), 'PPREDRUG') | strcmp(string(pvt.DRUG), 'PPOSTDRUG') | strcmp(string(pvt.DRUG), 'PPOSTRIDE'),:);
-%     chlorRuns = pvt(strcmp(string(pvt.DRUG), 'CPREDRUG') | strcmp(string(pvt.DRUG), 'CPOSTDRUG') | strcmp(string(pvt.DRUG), 'CPOSTRIDE'),:);
-%     clepRuns = pvt(strcmp(string(pvt.DRUG), 'CEPREDRUG') | strcmp(string(pvt.DRUG), 'CEPOSTDRUG') | strcmp(string(pvt.DRUG), 'CEPOSTRIDE'),:);
-%     
-%     % make table of differences of the statistic from:
-%     %   1. pre-drug to pre-ride
-%     %   2. pre-ride to post-ride
-%     %   3. pre-drug to post-ride
-%     meanDiffsPlac = make_3diff_table(placRuns, statistic, ROWS_PER_SUB);
-%     meanDiffsChlor = make_3diff_table(chlorRuns, statistic, ROWS_PER_SUB);
-%     meanDiffsClep = make_3diff_table(clepRuns, statistic, ROWS_PER_SUB);
-
-
+    t = statFinal; 
 
 end
 
