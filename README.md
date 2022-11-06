@@ -1,6 +1,5 @@
 # **Chlorphedra Trial Analysis**
-## **Patrick Howard**
-## *Space Medicine Innovations Lab, Dartmouth Hitchcock Medical Center*
+## **Patrick Howard**, *Space Medicine Innovations Lab, Dartmouth Hitchcock Medical Center*
 
 
 ### **Summary**
