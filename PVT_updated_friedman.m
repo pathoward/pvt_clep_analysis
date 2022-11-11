@@ -1,4 +1,4 @@
-load("Updates 11-4.mat")
+% load("Updates 11-4.mat")
 
 % v2.0 PVT significant differences
 % Patrick Howard
@@ -44,8 +44,11 @@ results_alldiff = containers.Map();
 results_3diff = containers.Map();
 results_2diff = containers.Map();
 
-res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT);
+%build pvt table
+pvt = readtable("pvtDataNov11.csv");
 
+%init analysis
+res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT);
 
 
 % Convert cell to a table and use first row as variable names
@@ -139,7 +142,7 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
 
     numSig = 0;
     results = cell([1 6]);
-%     results(1, :) = [{"Statistic"} {"Phase1"} {"Phase2"} {"P-Value"} {"Num Result"} {"Total Rels"}];
+%   results(1, :) = [{"Statistic"} {"Phase1"} {"Phase2"} {"P-Value"} {"Num Result"} {"Total Rels"}];
 
     %for each stat, search for significant relationships, and print
     for statIdx = 1:numel(statistics)
