@@ -10,8 +10,10 @@
 % aggregate statistics. Applicable to a study comparing reaction times
 % under the effects of motion sickness with management from
 % chlorpheniramine, chlorpheniramine+ephedrine (Chlorphedra), and placebo
-% treatment. P-value cutoff can be set here:
+% treatment. Reports relationships with significance under a given p-value
+% and can optionally return duplicate relationships. Both can be set here:
 P_CUT = .05;
+dup = 0; %1 for yes
 
 % Each statistic is individually evaluated. If two phases of the study have
 % a significant difference for a given statistic, it is reported as:
@@ -147,20 +149,41 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
         stat = statistics{statIdx};
         sigArray = sigMap(stat);
         
-        for row = 1:NUMPHASES
-            for col = 1:NUMPHASES
-            
-                if col ~= row
-                    
-                    %If significant (!= -1) report result
-                    if cell2mat(sigArray(row, col)) ~= -1 
-                        numSig = numSig + 1;
-                        report = [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig totalRels];
-                        results(numSig,:) = report;
+        if dup == 1 
+            for row = 1:NUMPHASES
+                for col = 1:NUMPHASES
+                
+                    if col ~= row
+                        
+                        %If significant (!= -1) report result
+                        if cell2mat(sigArray(row, col)) ~= -1 
+                            numSig = numSig + 1;
+                            report = [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig totalRels];
+                            results(numSig,:) = report;
+                        end
+    
                     end
-
+    
                 end
+            end
+        
 
+        elseif dup == 0
+            for row = 1:NUMPHASES
+                for col = row:NUMPHASES
+                
+                    if col ~= row
+                        
+                        %If significant (!= -1) report result
+                        if cell2mat(sigArray(row, col)) ~= -1 
+                            numSig = numSig + 1;
+                            report = [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig totalRels];
+                            results(numSig,:) = report;
+                        end
+    
+                    end
+    
+                end
             end
         end
 
