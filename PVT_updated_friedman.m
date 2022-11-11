@@ -37,7 +37,7 @@ set(0,'DefaultFigureVisible','off') %turns off excessive graphics
 
 %Specify which groups are being assessed
 stats = {'ALL_MEAN', 'ALL_MED', 'SLOW_MEAN', 'FAST_MEAN', 'IALL_MEAN', 'IALL_MED'};
-% stats = {'ALL_MEAN'};
+%stats = {'ALL_MEAN'};
 
 %contains stats mapped to their results
 results_alldiff = containers.Map();
@@ -45,6 +45,15 @@ results_3diff = containers.Map();
 results_2diff = containers.Map();
 
 res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT);
+
+
+
+% Convert cell to a table and use first row as variable names
+resTable = cell2table(res);
+resTable.Properties.VariableNames = ["Statistic" "Phase1" "Phase2" "P-Value" "Num Result" "Total Rels"];
+ 
+% Write the table to a CSV file
+writetable(resTable,'allStatsSignificant.csv')
 
 function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
     
@@ -72,7 +81,7 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
                      -1, -1, -1, -1, -1, -1, -1, -1, -1;
                      -1, -1, -1, -1, -1, -1, -1, -1, -1;
                      -1, -1, -1, -1, -1, -1, -1, -1, -1;
-                     -1, -1, -1, -1, -1, -1, -1, -1, -1;};
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 
         stat = statistics{statIdx};
@@ -86,9 +95,7 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
         
 
         % repeat comps in loops below (a:b and b:a) guarantee lowest pval
-        
 
-        
         for phase1 = 1:NUMPHASES
             for phase2 = 1:NUMPHASES
                 
@@ -132,6 +139,7 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
 
     numSig = 0;
     results = cell([1 6]);
+%     results(1, :) = [{"Statistic"} {"Phase1"} {"Phase2"} {"P-Value"} {"Num Result"} {"Total Rels"}];
 
     %for each stat, search for significant relationships, and print
     for statIdx = 1:numel(statistics)
