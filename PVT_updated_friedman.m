@@ -86,7 +86,6 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
                      -1, -1, -1, -1, -1, -1, -1, -1, -1;
                      -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
-
         stat = statistics{statIdx};
         table = tables{statIdx};
 
@@ -139,10 +138,9 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
 
     end
 
-
+    % init sig relationship counter, results 
     numSig = 0;
     results = cell([1 6]);
-%   results(1, :) = [{"Statistic"} {"Phase1"} {"Phase2"} {"P-Value"} {"Num Result"} {"Total Rels"}];
 
     %for each stat, search for significant relationships, and print
     for statIdx = 1:numel(statistics)
@@ -150,7 +148,7 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
         sigArray = sigMap(stat);
         
         for row = 1:NUMPHASES
-            for col = row:NUMPHASES
+            for col = 1:NUMPHASES
             
                 if col ~= row
                     
