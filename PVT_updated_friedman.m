@@ -4,24 +4,25 @@ load("Updates 11-4.mat")
 % Patrick Howard
 % Space Medicine Innovations Lab, Dartmouth Hitchcock Medical Center
 
-% rewrite to make comparisons of one baseline to all effects
 % work in bonferroni or tukey posthoc testing 
 
-% 1) replicate this using 
-% 2) do a data transform (log/arcsin)
-% 3) 
+% This script isolates significant relationships between reaction time
+% aggregate statistics. Applicable to a study comparing reaction times
+% under the effects of motion sickness with management from
+% chlorpheniramine, chlorpheniramine+ephedrine (Chlorphedra), and placebo
+% treatment. P-value cutoff can be set here:
+P_CUT = .05;
 
-% This script looks for significant differences between study phases of 
-% chlorpheniramine/ephedrine PVT motion sickness trials. Comparisons of
-% each column are made. Comparisons are made between predrug, 
-% postdrug/preride, and postride phases, as well as
-% a simplified predrug/postride phase comparison. Outputs are formatted as:
-%   {STATISTIC} {predrug/preride significant} {preride/postride significant}
-%   {predrug/postride significant}
-% significance measured by Friedman's nonparametric ANOVA. If critical
-% chisquare exceeded, value is 1. If not, value is 0.
+% Each statistic is individually evaluated. If two phases of the study have
+% a significant difference for a given statistic, it is reported as:
+%   [{STATISTIC} {PHASE1} {PHASE2} {P-VALUE} {SIGCOUNT} {TOTCOUNT}]
+% where SIGCOUNT is the number of significant relationships observed up to
+% that point, and TOTCOUNT is the total number of relationships tested
+% (including forward/backward pairs, i.e. a:b and b:a are distinct). 
+% 
+% The reported p-value between two significantly different phases Phase1 
+% and Phase2 is the minimum of Phase1 vs. Phase2 and Phase2 vs. Phase1
 
-%set(0,'DefaultFigureVisible','off') in command line to turn off graphics
 
 %%%%%% Set relevant constants %%%%%%%
 ROWS_PER_SUB = 3; %stores number of rows with screen visits excluded
@@ -29,48 +30,23 @@ SUBCOUNT = 18; %number of study subjects/number of columns
 NUM3DIFFS = 3; %number of columns for Friedman's test
 NUM2DIFFS = 2;
 NUMPHASES = 9; %number of timepoints measured
-P_CUT = .05; %pval cutoff
 REPS = 1; %reps for Friedman's parameter
 CRIT_CHI2_2DF = 5.991; % critical chi2 val for df = 2 (comparing 3 columns)
 CRIT_CHI2_1DF = 3.841; % critical chi2 val for df = 1 (comparing 2 columns)
 set(0,'DefaultFigureVisible','off') %turns off excessive graphics
 
-%utility cell array of all stats
+%Specify which groups are being assessed
 stats = {'ALL_MEAN', 'ALL_MED', 'SLOW_MEAN', 'FAST_MEAN', 'IALL_MEAN', 'IALL_MED'};
+% stats = {'ALL_MEAN'};
 
 %contains stats mapped to their results
 results_alldiff = containers.Map();
 results_3diff = containers.Map();
 results_2diff = containers.Map();
 
-% % for each stat, complete the 3diff and 2diff analysis
-% for idx = 1:numel(stats)
-%     
-%     stat = stats{idx};
-%     
-%     results_alldiff(stat) = studyColumnAll()
-%     results_3diff(stat) = studyColumn3diffs(stat, pvt, ROWS_PER_SUB, NUM3DIFFS, CRIT_CHI2_2DF);
-%     results_2diff(stat) = studyColumn2diffs(stat, pvt, ROWS_PER_SUB, NUM2DIFFS, CRIT_CHI2_1DF);
-% 
-% end
-% 
-% %return results of 3diff analysis
-% k = keys(results_3diff) ;
-% val = values(results_3diff) ;
-% for i = 1:length(results_3diff)
-%  [k{i} val{i}];
-% end
-% 
-% %return results of 2diff analysis
-% k = keys(results_2diff) ;
-% val = values(results_2diff) ;
-% for i = 1:length(results_2diff)
-%  [k{i} val{i}];
-% end
+res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT);
 
-print = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2_1DF, P_CUT);
-
-function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2_1DF, P_CUT)
+function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
     
     stats_tables = containers.Map();
 
@@ -83,6 +59,7 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
     statistics = keys(stats_tables);
     tables = values(stats_tables);
     sigMap = containers.Map();
+    totalRels = 0; %counts relationships tested
 
     %2d array indicating if study phases had a sig difference
     for statIdx = 1:numel(statistics)
@@ -100,17 +77,27 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
 
         stat = statistics{statIdx};
         table = tables{statIdx};
+
+        %map phase numbers to their col names, more easily iterable
         phaseMap = containers.Map({1,2,3,4,5,6,7,8,9}, ...
             {'PPREDRUG','PPOSTDRUG','PPOSTRIDE', ...
             'CPREDRUG','CPOSTDRUG','CPOSTRIDE',...
             'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'});
         
-        %guarantees lowest possible sub-cutoff p val
+
+        % repeat comps in loops below (a:b and b:a) guarantee lowest pval
+        
+
+        
         for phase1 = 1:NUMPHASES
             for phase2 = 1:NUMPHASES
-            
+                
                 if phase1 ~= phase2
-    
+                    
+                    %count tested relationships
+                    totalRels = totalRels + 1;
+
+                    %pull columns of each phase in consideration
                     studyArray = table2array(table(:,{phaseMap(phase1),phaseMap(phase2)}));
                     p = friedman(studyArray, 1, 'off');
                     
@@ -122,7 +109,7 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
                         curr_p_b = cell2mat(statArray(phase2, phase1));
 
                         %update both to lowest if currently -1, or not -1
-                        %but greater
+                        %but greater than new p-value
 
                         if or(curr_p_f == -1, and(curr_p_f ~= -1, p < curr_p_f))
                             statArray(phase1, phase2) = num2cell(p);
@@ -150,14 +137,13 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
         sigArray = sigMap(stat);
 
         for row = 1:NUMPHASES
-            for col = 1:NUMPHASES
+            for col = row:NUMPHASES
             
                 if col ~= row
                     
-                    %print stat, phases, pval, numresults, max Results
-                    %(6stats*72comparisons)
-                    if cell2mat(sigArray(row, col)) ~= -1 %only changed if significant
-                        [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig 6*72]
+                    %If significant (!= -1) report result
+                    if cell2mat(sigArray(row, col)) ~= -1 
+                        [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig totalRels]
                         numSig = numSig + 1;
                     end
 
@@ -170,6 +156,11 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, CRIT_CHI2
     
     results = sigMap;
 end
+
+
+
+
+
 
 % takes a statistic from column names and calculates if there
 % is a significant difference across each patient for 3 differences:
@@ -349,6 +340,7 @@ end
 
 %same as make_3diff_table, but without preride-postride diff
 function t = make_2diff_table(tableIn, tableInVar, rows_per_sub)
+
     
     %preallocate table
     subjects = height(tableIn)/rows_per_sub;
@@ -375,3 +367,32 @@ function t = make_2diff_table(tableIn, tableInVar, rows_per_sub)
     end
 
 end
+
+
+
+%old code for running 3diff/2diff analysis
+
+% % for each stat, complete the 3diff and 2diff analysis
+% for idx = 1:numel(stats)
+%     
+%     stat = stats{idx};
+%     
+%     results_alldiff(stat) = studyColumnAll()
+%     results_3diff(stat) = studyColumn3diffs(stat, pvt, ROWS_PER_SUB, NUM3DIFFS, CRIT_CHI2_2DF);
+%     results_2diff(stat) = studyColumn2diffs(stat, pvt, ROWS_PER_SUB, NUM2DIFFS, CRIT_CHI2_1DF);
+% 
+% end
+% 
+% %return results of 3diff analysis
+% k = keys(results_3diff) ;
+% val = values(results_3diff) ;
+% for i = 1:length(results_3diff)
+%  [k{i} val{i}];
+% end
+% 
+% %return results of 2diff analysis
+% k = keys(results_2diff) ;
+% val = values(results_2diff) ;
+% for i = 1:length(results_2diff)
+%  [k{i} val{i}];
+% end
