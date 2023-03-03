@@ -1,4 +1,4 @@
-% load("Updates 11-4.mat")
+load("Updates 11-4.mat")
 
 % v2.0 PVT significant differences
 % Patrick Howard
@@ -50,8 +50,8 @@ results_2diff = containers.Map();
 pvt = readtable("pvtDataNov11.csv");
 
 %init analysis
-res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT);
-
+res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
+resAll = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
 
 % Convert cell to a table and use first row as variable names
 resTable = cell2table(res);
@@ -60,7 +60,14 @@ resTable.Properties.VariableNames = ["Statistic" "Phase1" "Phase2" "P-Value" "Nu
 % Write the table to a CSV file
 writetable(resTable,'allStatsSignificant.csv')
 
-function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
+% Convert cell to a table and use first row as variable names
+allTable = cell2table(resAll);
+allTable.Properties.VariableNames = ["Statistic" "Phase1" "Phase2" "P-Value" "Num Result" "Total Rels"];
+ 
+% Write the table to a CSV file
+writetable(allTable,'allStats.csv')
+
+function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
     
     stats_tables = containers.Map();
 
@@ -192,7 +199,136 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT)
 end
 
 
+function results = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
+    
+    stats_tables = containers.Map();
 
+    %build table for each statistic
+    for idx = 1:numel(stats)
+        stat = stats{idx};     
+        stats_tables(stat) = flattenData(stat, pvt, ROWS_PER_SUB);
+    end
+    
+    statistics = keys(stats_tables);
+    tables = values(stats_tables);
+    sigMap = containers.Map();
+    totalRels = 0; %counts relationships tested
+
+    %2d array indicating if study phases had a sig difference
+    for statIdx = 1:numel(statistics)
+        
+        statArray = {-1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1;
+                     -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+        stat = statistics{statIdx};
+        table = tables{statIdx};
+
+        %map phase numbers to their col names, more easily iterable
+        phaseMap = containers.Map({1,2,3,4,5,6,7,8,9}, ...
+            {'PPREDRUG','PPOSTDRUG','PPOSTRIDE', ...
+            'CPREDRUG','CPOSTDRUG','CPOSTRIDE',...
+            'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'});
+        
+
+        % repeat comps in loops below (a:b and b:a) guarantee lowest pval
+
+        for phase1 = 1:NUMPHASES
+            for phase2 = 1:NUMPHASES
+                
+                if phase1 ~= phase2
+                    
+                    %count another tested relationship
+                    totalRels = totalRels + 1;
+
+                    %pull data columns of each phase in consideration
+                    studyArray = table2array(table(:,{phaseMap(phase1),phaseMap(phase2)}));
+                    p = friedman(studyArray, 1, 'off');
+                    
+                    %if significant, record relationship
+                    if p <= P_CUT
+                        
+                        %find curr vals
+                        curr_p_f = cell2mat(statArray(phase1, phase2));
+                        curr_p_b = cell2mat(statArray(phase2, phase1));
+
+                        %update both to lowest if currently -1, or not -1
+                        %but greater than new p-value
+                        if or(curr_p_f == -1, and(curr_p_f ~= -1, p < curr_p_f))
+                            statArray(phase1, phase2) = num2cell(p);
+                        end
+
+                        if or(curr_p_b == -1, and(curr_p_b ~= -1, p < curr_p_b))
+                            statArray(phase2, phase1) = num2cell(p);
+                        end
+
+                    end                   
+    
+                end
+            end
+        end
+        
+        %add results to the global results
+        sigMap(stat) = statArray;
+
+    end
+
+    % init sig relationship counter, results 
+    numSig = 0;
+    results = cell([1 6]);
+
+    %for each stat, search for significant relationships, and print
+    for statIdx = 1:numel(statistics)
+        stat = statistics{statIdx};
+        sigArray = sigMap(stat);
+        
+        if dup == 1 
+            for row = 1:NUMPHASES
+                for col = 1:NUMPHASES
+                
+                    if col ~= row
+                        
+                        %If significant (!= -1) report result
+
+                        numSig = numSig + 1;
+                        report = [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig totalRels];
+                        results(numSig,:) = report;
+                        
+    
+                    end
+    
+                end
+            end
+        
+
+        elseif dup == 0
+            for row = 1:NUMPHASES
+                for col = row:NUMPHASES
+                
+                    if col ~= row
+                        
+                        %If significant (!= -1) report result
+                        if cell2mat(sigArray(row, col)) ~= -1 
+                            numSig = numSig + 1;
+                            report = [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig totalRels];
+                            results(numSig,:) = report;
+                        end
+    
+                    end
+    
+                end
+            end
+        end
+
+    end
+
+end
 
 
 
