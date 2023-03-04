@@ -50,8 +50,9 @@ results_2diff = containers.Map();
 pvt = readtable("pvtDataNov11.csv");
 
 %init analysis
-res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
 resAll = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
+res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
+
 
 % Convert cell to a table and use first row as variable names
 resTable = cell2table(res);
@@ -251,24 +252,23 @@ function results = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, 
                     studyArray = table2array(table(:,{phaseMap(phase1),phaseMap(phase2)}));
                     p = friedman(studyArray, 1, 'off');
                     
-                    %if significant, record relationship
-                    if p <= P_CUT
+
                         
-                        %find curr vals
-                        curr_p_f = cell2mat(statArray(phase1, phase2));
-                        curr_p_b = cell2mat(statArray(phase2, phase1));
+                    %find curr vals
+                    curr_p_f = cell2mat(statArray(phase1, phase2));
+                    curr_p_b = cell2mat(statArray(phase2, phase1));
 
-                        %update both to lowest if currently -1, or not -1
-                        %but greater than new p-value
-                        if or(curr_p_f == -1, and(curr_p_f ~= -1, p < curr_p_f))
-                            statArray(phase1, phase2) = num2cell(p);
-                        end
+                    %update both to lowest if currently -1, or not -1
+                    %but greater than new p-value
+                    if or(curr_p_f == -1, and(curr_p_f ~= -1, p < curr_p_f))
+                        statArray(phase1, phase2) = num2cell(p);
+                    end
 
-                        if or(curr_p_b == -1, and(curr_p_b ~= -1, p < curr_p_b))
-                            statArray(phase2, phase1) = num2cell(p);
-                        end
+                    if or(curr_p_b == -1, and(curr_p_b ~= -1, p < curr_p_b))
+                        statArray(phase2, phase1) = num2cell(p);
+                    end
 
-                    end                   
+                 
     
                 end
             end
@@ -294,7 +294,6 @@ function results = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, 
                 
                     if col ~= row
                         
-                        %If significant (!= -1) report result
 
                         numSig = numSig + 1;
                         report = [stat phaseMap(row) phaseMap(col) sigArray(row, col) numSig totalRels];
