@@ -38,7 +38,7 @@ CRIT_CHI2_1DF = 3.841; % critical chi2 val for df = 1 (comparing 2 columns)
 set(0,'DefaultFigureVisible','off') %turns off excessive graphics
 
 %Specify which groups are being assessed
-stats = {'ALL_MEAN', 'ALL_MED', 'SLOW_MEAN', 'FAST_MEAN', 'IALL_MEAN', 'IALL_MED'};
+statlist = {'ALL_MEAN', 'ALL_MED', 'SLOW_MEAN', 'FAST_MEAN', 'IALL_MEAN', 'IALL_MED'};
 %stats = {'ALL_MEAN'};
 
 %contains stats mapped to their results
@@ -47,11 +47,12 @@ results_3diff = containers.Map();
 results_2diff = containers.Map();
 
 %build pvt table
-pvt = readtable("pvtDataNov11.csv");
+% pvt = readtable("pvtDataNov11.csv");
+pvt = readtable("pvtData_PH_LapseAdded.csv");
 
 %init analysis
 resAll = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
-res = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
+res = studyColumnAll(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
 
 
 % Convert cell to a table and use first row as variable names
@@ -200,13 +201,13 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, du
 end
 
 
-function results = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
+function results = studyColumnAllRelations(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
     
     stats_tables = containers.Map();
 
     %build table for each statistic
-    for idx = 1:numel(stats)
-        stat = stats{idx};     
+    for idx = 1:numel(statlist)
+        stat = statlist{idx};     
         stats_tables(stat) = flattenData(stat, pvt, ROWS_PER_SUB);
     end
     
@@ -250,9 +251,9 @@ function results = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, 
 
                     %pull data columns of each phase in consideration
                     studyArray = table2array(table(:,{phaseMap(phase1),phaseMap(phase2)}));
-                    p = friedman(studyArray, 1, 'off');
+                    [p, ~, stats] = friedman(studyArray, 1, 'off');
                     
-
+                    
                         
                     %find curr vals
                     curr_p_f = cell2mat(statArray(phase1, phase2));
@@ -268,7 +269,7 @@ function results = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, 
                         statArray(phase2, phase1) = num2cell(p);
                     end
 
-                 
+                    [t_results,t_means,~,t_gnames] = multcompare(stats, "CriticalValueType","bonferroni");
     
                 end
             end
