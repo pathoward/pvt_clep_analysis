@@ -51,23 +51,24 @@ results_2diff = containers.Map();
 pvt = readtable("pvtData_PH_LapseAdded.csv");
 
 %init analysis
-resAll = studyColumnAllRelations(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
-res = studyColumnAll(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
+% res = studyColumnAll(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
+resAll = studyColumnAllRelations(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup);
+
 
 
 % Convert cell to a table and use first row as variable names
-resTable = cell2table(res);
-resTable.Properties.VariableNames = ["Statistic" "Phase1" "Phase2" "P-Value" "Num Result" "Total Rels"];
+% resTable = cell2table(res);
+% resTable.Properties.VariableNames = ["Statistic" "Phase1" "Phase2" "P-Value" "Num Result" "Total Rels"];
  
 % Write the table to a CSV file
-writetable(resTable,'allStatsSignificant.csv')
+% writetable(resTable,'allStatsSignificant.csv')
 
 % Convert cell to a table and use first row as variable names
 allTable = cell2table(resAll);
 allTable.Properties.VariableNames = ["Statistic" "Phase1" "Phase2" "P-Value" "Num Result" "Total Rels"];
  
 % Write the table to a CSV file
-writetable(allTable,'allStats.csv')
+writetable(allTable,'allStatsBonferroni.csv')
 
 function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
     
@@ -200,8 +201,262 @@ function results = studyColumnAll(stats, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, du
 
 end
 
-
 function results = studyColumnAllRelations(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
+
+    stats_tables = containers.Map();
+
+    % Build table for each statistic
+    for idx = 1:numel(statlist)
+        stat = statlist{idx};
+        stats_tables(stat) = flattenData(stat, pvt, ROWS_PER_SUB);
+    end
+
+    statistics = keys(stats_tables);
+    tables = values(stats_tables);
+    sigMap = containers.Map();
+    totalRels = 0; % Counts relationships tested
+
+    % 2D array indicating if study phases had a significant difference
+    for statIdx = 1:numel(statistics)
+
+        statArray = cell(NUMPHASES);
+        statArray(:) = {-1}; % Initialize statArray with -1
+
+        stat = statistics{statIdx};
+        table = tables{statIdx};
+
+        % Map phase numbers to their column names for easier iteration
+        phaseMap = containers.Map({1,2,3,4,5,6,7,8,9}, ...
+            {'PPREDRUG','PPOSTDRUG','PPOSTRIDE', ...
+            'CPREDRUG','CPOSTDRUG','CPOSTRIDE',...
+            'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'});
+
+        % Repeat comparisons in loops below (a:b and b:a) to guarantee lowest p-value
+        for phase1 = 1:NUMPHASES
+            for phase2 = 1:NUMPHASES
+
+                if phase1 ~= phase2
+
+                    % Count another tested relationship
+                    totalRels = totalRels + 1;
+
+                    % Pull data columns of each phase in consideration
+                    studyArray = table2array(table(:, {phaseMap(phase1),phaseMap(phase2)}));
+                    [p, ~, stats] = friedman(studyArray, 1, 'off');
+
+                    % Update both to lowest if currently -1 or not -1 but greater than new p-value
+                    if statArray{phase1, phase2} == -1 || (statArray{phase1, phase2} ~= -1 && p < statArray{phase1, phase2})
+                        statArray{phase1, phase2} = p;
+                    end
+
+                    if statArray{phase2, phase1} == -1 || (statArray{phase2, phase1} ~= -1 && p < statArray{phase2, phase1})
+                        statArray{phase2, phase1} = p;
+                    end
+
+                    % Perform post-hoc Nemenyi test
+                    [t_results, ~, ~, ~] = multcompare(stats, 'CriticalValueType', 'bonferroni');
+
+                    % Check if p-value is significant
+                    if any(t_results(:, end) < P_CUT)
+                        % Record the significant p-value
+                        sig_p = min(t_results(:, end));
+                        % Update the corresponding entry in the statArray
+                        statArray{phase1, phase2} = sig_p;
+                        statArray{phase2, phase1} = sig_p;
+                    else
+                        % Record the lowest p-value found
+                        low_p = min(t_results(:, end));
+
+                        % add 1 to indicate insignificance 
+                        statArray{phase1, phase2} = low_p + 1;
+                        statArray{phase2, phase1} = low_p + 1;
+                    end
+
+                end
+            end
+        end
+
+        % Add results to the global sigMap
+        sigMap(stat) = statArray;
+
+    end
+
+    % Initialize sig relationship counter and results
+    numSig = 0;
+    results = cell(1, 6);
+
+    % For each stat, search for significant relationships and print
+    for statIdx = 1:numel(statistics)
+        stat = statistics{statIdx};
+        sigArray = sigMap(stat);
+
+        if dup == 1
+            for row = 1:NUMPHASES
+                for col = 1:NUMPHASES
+
+                    if col ~= row
+
+                        numSig = numSig + 1;
+                        report = {stat, phaseMap(row), phaseMap(col), sigArray{row, col}, numSig, totalRels};
+                        results(numSig, :) = report;
+
+                    end
+
+                end
+            end
+
+
+        elseif dup == 0
+            for row = 1:NUMPHASES
+                for col = row:NUMPHASES
+
+                    if col ~= row
+
+                        % If significant (!= -1), report the result
+                        if sigArray{row, col} ~= -1
+                            numSig = numSig + 1;
+                            report = {stat, phaseMap(row), phaseMap(col), sigArray{row, col}, numSig, totalRels};
+                            results(numSig, :) = report;
+                        end
+
+                    end
+
+                end
+            end
+        end
+
+    end
+
+end
+
+
+function results = Old2studyColumnAllRelations(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
+
+    stats_tables = containers.Map();
+
+    % Build table for each statistic
+    for idx = 1:numel(statlist)
+        stat = statlist{idx};
+        stats_tables(stat) = flattenData(stat, pvt, ROWS_PER_SUB);
+    end
+
+    statistics = keys(stats_tables);
+    tables = values(stats_tables);
+    sigMap = containers.Map();
+    totalRels = 0; % Counts relationships tested
+
+    % 2D array indicating if study phases had a significant difference
+    for statIdx = 1:numel(statistics)
+
+        statArray = cell(NUMPHASES);
+        statArray(:) = {-1}; % Initialize statArray with -1
+
+        stat = statistics{statIdx};
+        table = tables{statIdx};
+
+        % Map phase numbers to their column names for easier iteration
+        phaseMap = containers.Map({1,2,3,4,5,6,7,8,9}, ...
+            {'PPREDRUG','PPOSTDRUG','PPOSTRIDE', ...
+            'CPREDRUG','CPOSTDRUG','CPOSTRIDE',...
+            'CEPREDRUG','CEPOSTDRUG','CEPOSTRIDE'});
+
+        % Repeat comparisons in loops below (a:b and b:a) to guarantee lowest p-value
+        for phase1 = 1:NUMPHASES
+            for phase2 = 1:NUMPHASES
+
+                if phase1 ~= phase2
+
+                    % Count another tested relationship
+                    totalRels = totalRels + 1;
+
+                    % Pull data columns of each phase in consideration
+                    studyArray = table2array(table(:, {phaseMap(phase1),phaseMap(phase2)}));
+                    [p, ~, stats] = friedman(studyArray, 1, 'off');
+
+                    % Update both to lowest if currently -1 or not -1 but greater than new p-value
+                    if statArray{phase1, phase2} == -1 || (statArray{phase1, phase2} ~= -1 && p < statArray{phase1, phase2})
+                        statArray{phase1, phase2} = p;
+                    end
+
+                    if statArray{phase2, phase1} == -1 || (statArray{phase2, phase1} ~= -1 && p < statArray{phase2, phase1})
+                        statArray{phase2, phase1} = p;
+                    end
+
+                    % Perform post-hoc Nemenyi test
+                    [t_results, ~, ~, ~] = multcompare(stats, 'CriticalValueType', 'bonferroni');
+
+                    % Check if p-value is significant
+                    if any(t_results(:, end) < P_CUT)
+                        % Record the significant p-value
+                        sig_p = min(t_results(:, end));
+                        % Update the corresponding entry in the statArray
+                        statArray{phase1, phase2} = sig_p;
+                        statArray{phase2, phase1} = sig_p;
+                    else
+                        % Record 10 for non-significant p-value
+                        statArray{phase1, phase2} = 10;
+                        statArray{phase2, phase1} = 10;
+                    end
+
+                end
+            end
+        end
+
+        % Add results to the global sigMap
+        sigMap(stat) = statArray;
+
+    end
+
+    % Initialize sig relationship counter and results
+    numSig = 0;
+    results = cell(1, 6);
+
+    % For each stat, search for significant relationships and print
+    for statIdx = 1:numel(statistics)
+        stat = statistics{statIdx};
+        sigArray = sigMap(stat);
+
+        if dup == 1
+            for row = 1:NUMPHASES
+                for col = 1:NUMPHASES
+
+                    if col ~= row
+
+                        numSig = numSig + 1;
+                        report = [stat phaseMap(row) phaseMap(col) sigArray{row, col} numSig totalRels];
+                        results(numSig, :) = report;
+
+                    end
+
+                end
+            end
+
+
+        elseif dup == 0
+            for row = 1:NUMPHASES
+                for col = row:NUMPHASES
+
+                    if col ~= row
+
+                        % If significant (!= -1), report result
+                        if sigArray{row, col} ~= -1
+                            numSig = numSig + 1;
+                            report = [stat phaseMap(row) phaseMap(col) sigArray{row, col} numSig totalRels];
+                            results(numSig, :) = report;
+                        end
+
+                    end
+
+                end
+            end
+        end
+
+    end
+
+end
+
+
+function results = OldstudyColumnAllRelations(statlist, pvt, ROWS_PER_SUB, NUMPHASES, P_CUT, dup)
     
     stats_tables = containers.Map();
 
@@ -269,14 +524,31 @@ function results = studyColumnAllRelations(statlist, pvt, ROWS_PER_SUB, NUMPHASE
                         statArray(phase2, phase1) = num2cell(p);
                     end
 
+                    %perform bonferroni correction
                     [t_results,t_means,~,t_gnames] = multcompare(stats, "CriticalValueType","bonferroni");
     
                 end
             end
         end
         
-        %add results to the global results
-        sigMap(stat) = statArray;
+%         %add results to the global results
+%         sigMap(stat) = statArray;
+
+%         Or, only add those that pass Bonferroni (ChatGPT adapted)
+
+        
+            % Check if p-value is significant
+            if any(t_results(:, end) < P_CUT)
+                % Record the significant p-value
+                sig_p = min(t_results(:, end));
+                % Update the corresponding entry in the statArray
+                statArray(phase1, phase2) = num2cell(sig_p);
+                statArray(phase2, phase1) = num2cell(sig_p);
+            else
+                % Record 10 for non-significant p-value
+                statArray(phase1, phase2) = num2cell(10);
+                statArray(phase2, phase1) = num2cell(10);
+            end
 
     end
 
